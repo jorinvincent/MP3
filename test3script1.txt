@@ -1,0 +1,3 @@
+write-request-b Printer_0
+sleep 50
+write-release Printer_0

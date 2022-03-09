@@ -1,0 +1,4 @@
+write-request-b Printer_0
+write-request-b Printer_0
+write-release Printer_0
+write-release Printer_0

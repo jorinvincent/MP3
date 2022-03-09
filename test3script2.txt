@@ -1,0 +1,4 @@
+read-request-n Scanner_0
+sleep 100
+read-release Scanner_0 | write-request-b Printer_0
+write-release Printer_0

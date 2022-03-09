@@ -1,0 +1,11 @@
+Printer_0 was added to $c
+User Starting: $d
+$c received EXCLUSIVE_WRITE_BLOCKING request for Printer_0 from $d
+$c granted EXCLUSIVE_WRITE_BLOCKING request for Printer_0 to $d
+$c received EXCLUSIVE_WRITE_BLOCKING request for Printer_0 from $d
+$c granted EXCLUSIVE_WRITE_BLOCKING request for Printer_0 to $d
+User Terminating: $d
+$c received Release EXCLUSIVE_WRITE access to Printer_0 from $d
+$d released EXCLUSIVE_WRITE access to Printer_0 (managed by $c)
+$c received Release EXCLUSIVE_WRITE access to Printer_0 from $d
+$d released EXCLUSIVE_WRITE access to Printer_0 (managed by $c)

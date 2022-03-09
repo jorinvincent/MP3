@@ -1,0 +1,33 @@
+Printer_0 was added to $c
+Printer_1 was added to $c
+Scanner_0 was added to $e
+User Starting: $f
+User Starting: $d
+$c received EXCLUSIVE_WRITE_BLOCKING request for Printer_0 from $d
+$e received EXCLUSIVE_WRITE_BLOCKING request for Printer_0 from $f
+$e received CONCURRENT_READ_NONBLOCKING request for Scanner_0 from $f
+$c granted EXCLUSIVE_WRITE_BLOCKING request for Printer_0 to $d
+$e granted CONCURRENT_READ_NONBLOCKING request for Scanner_0 to $f
+$c received CONCURRENT_READ_NONBLOCKING request for Scanner_0 from $d
+$e discovered that Printer_0 is managed by $c
+$e forwarded EXCLUSIVE_WRITE_BLOCKING request for Printer_0 to $c
+$c received EXCLUSIVE_WRITE_BLOCKING request for Printer_0 from $f
+$c discovered that Scanner_0 is managed by $e
+$c forwarded CONCURRENT_READ_NONBLOCKING request for Scanner_0 to $e
+$e received CONCURRENT_READ_NONBLOCKING request for Scanner_0 from $d
+$e granted CONCURRENT_READ_NONBLOCKING request for Scanner_0 to $d
+User Terminating: $d
+$c received Release EXCLUSIVE_WRITE access to Printer_0 from $d
+$d released EXCLUSIVE_WRITE access to Printer_0 (managed by $c)
+$c granted EXCLUSIVE_WRITE_BLOCKING request for Printer_0 to $f
+$c received Release CONCURRENT_READ access to Scanner_0 from $d
+$c forwarded Release CONCURRENT_READ access to Scanner_0 to $e
+$e received Release CONCURRENT_READ access to Scanner_0 from $d
+User Terminating: $f
+$d released CONCURRENT_READ access to Scanner_0 (managed by $e)
+$e received Release EXCLUSIVE_WRITE access to Printer_0 from $f
+$e forwarded Release EXCLUSIVE_WRITE access to Printer_0 to $c
+$e received Release CONCURRENT_READ access to Scanner_0 from $f
+$c received Release EXCLUSIVE_WRITE access to Printer_0 from $f
+$f released CONCURRENT_READ access to Scanner_0 (managed by $e)
+$f released EXCLUSIVE_WRITE access to Printer_0 (managed by $c)
