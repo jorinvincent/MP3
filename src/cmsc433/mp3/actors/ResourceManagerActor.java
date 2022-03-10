@@ -1,9 +1,12 @@
 package cmsc433.mp3.actors;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.Queue;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
@@ -18,6 +21,16 @@ public class ResourceManagerActor extends AbstractActor {
 	
 	private ActorRef logger;					// Actor to send logging messages to
 	
+	private Set<ActorRef> remoteManagers = new HashSet<ActorRef>();
+	private Set<ActorRef> localUsers = new HashSet<ActorRef>();
+	private Map<String, Resource> localResources = new HashMap<String, Resource>();
+	private Map<String, Queue<AccessRequestMsg>> resourceQueue = new HashMap<String, Queue<AccessRequestMsg>>();
+	private Map<String, List<ActorRef>> resourceReads = new HashMap<String, List<ActorRef>>();
+	private Map<String, ActorRef> resourceWrites = new HashMap<String, ActorRef>();
+	private Map<String, ActorRef> sourceList = new HashMap<String, ActorRef>();
+	private Map<Object, Integer> potentialList = new HashMap<Object, Integer>();
+	private Map<ActorRef, Map<String, Object>> resourceMessages = new HashMap<ActorRef, Map<String, Object>>();
+
 	/**
 	 * Props structure-generator for this class.
 	 * @return  Props structure
@@ -76,6 +89,158 @@ public class ResourceManagerActor extends AbstractActor {
 	 */
 	
 	public void onReceive(Object msg) throws Exception {		
-		
+		if (msg instanceof AddRemoteManagersRequestMsg) {
+			AddRemoteManagersRequestMsg message = (AddRemoteManagersRequestMsg) msg;
+		}
+		else if (msg instanceof AddLocalUsersRequestMsg) {
+			AddLocalUsersRequestMsg message = (AddLocalUsersRequestMsg) msg;
+		}
+		else if (msg instanceof AddInitialLocalResourcesRequestMsg) {
+			AddInitialLocalResourcesRequestMsg message = (AddInitialLocalResourcesRequestMsg) msg;
+		}
+		else if (msg instanceof AccessRequestMsg) {
+			AccessRequestMsg message = (AccessRequestMsg) msg;
+			AccessRequest request = message.getAccessRequest();
+			ActorRef requestSender = message.getReplyTo();
+			String resourceName = request.getResourceName();
+			AccessRequestType requestType = request.getType();
+
+			Queue<AccessRequestMsg> accessRequests;
+
+			log(LogMsg.makeAccessRequestReceivedLogMsg(requestSender, getSelf(), request));
+
+			if (localResources.containsKey(resourceName)) {
+				if (requestType == AccessRequestType.CONCURRENT_READ_BLOCKING || requestType == AccessRequestType.EXCLUSIVE_WRITE_BLOCKING) {
+					accessRequests = resourceQueue.get(resourceName);
+					if (accessRequests == null) {
+						accessRequests = new LinkedList<AccessRequestMsg>();
+					}
+					accessRequests.add(message);
+					resourceQueue.put(resourceName, accessRequests);
+
+					handleBlockingAccessRequests(resourceName);
+				}
+				else {
+					if (resourceQueue.get(resourceName) == null || resourceQueue.get(resourceName).isEmpty()) {
+						handleNonBlockingAccessRequests(message);
+					} else {
+						log(LogMsg.makeAccessRequestDeniedLogMsg(requestSender, getSelf(), request, AccessRequestDenialReason.RESOURCE_BUSY));
+						requestSender.tell(new AccessRequestDeniedMsg(request, AccessRequestDenialReason.RESOURCE_BUSY), getSelf());
+					}
+				}
+			}
+		}
+		else if (msg instanceof AccessReleaseMsg) {
+			AccessReleaseMsg message = (AccessReleaseMsg) msg;
+		}
+		else if (msg instanceof WhoHasResourceRequestMsg) {
+			WhoHasResourceRequestMsg message = (WhoHasResourceRequestMsg) msg;
+		}
+		else if (msg instanceof WhoHasResourceResponseMsg) {
+			WhoHasResourceResponseMsg message = (WhoHasResourceResponseMsg) msg;
+		}
 	}
+
+
+
+	private void handleBlockingAccessRequests(String resourceName) {
+		Queue<AccessRequestMsg> accessRequests = resourceQueue.get(resourceName);
+
+		List<ActorRef> users;
+
+		while (!accessRequests.isEmpty()) {
+			AccessRequestMsg message = accessRequests.peek();
+			AccessRequest request = message.getAccessRequest();
+			ActorRef requestSender = message.getReplyTo();
+			AccessRequestType requestType = request.getType();
+
+			if (requestType == AccessRequestType.CONCURRENT_READ_BLOCKING) {
+				if (exclusiveWriteAvailable(resourceName, requestSender)) {
+					users = resourceReads.get(resourceName);
+					if (users == null) {
+						users = new LinkedList<ActorRef>();
+					}
+					users.add(requestSender);
+					resourceReads.put(resourceName, users);
+					accessRequests.poll();
+					
+					log(LogMsg.makeAccessRequestGrantedLogMsg(requestSender, self(), request));
+					requestSender.tell(new AccessRequestGrantedMsg(message), getSelf());
+				}
+			}
+			else if (requestType == AccessRequestType.EXCLUSIVE_WRITE_BLOCKING) {
+				if (exclusiveWriteAvailable(resourceName, requestSender) && concurrentReadAvailable(resourceName, requestSender)) {
+					resourceWrites.put(resourceName, requestSender);
+					accessRequests.poll();
+
+					log(LogMsg.makeAccessRequestGrantedLogMsg(requestSender, getSelf(), request));
+					requestSender.tell(new AccessRequestGrantedMsg(message), getSelf());
+				}
+			}
+		}
+	}
+
+	private void handleNonBlockingAccessRequests(AccessRequestMsg message) {
+		AccessRequest request = message.getAccessRequest();
+		ActorRef requestSender = message.getReplyTo();
+		String resourceName = request.getResourceName();
+		AccessRequestType requestType = request.getType();
+
+		List<ActorRef> users;
+
+		if (requestType == AccessRequestType.CONCURRENT_READ_NONBLOCKING) {
+			if (exclusiveWriteAvailable(resourceName, requestSender)) {
+				users = resourceReads.get(resourceName);
+				if (users == null) {
+					users = new LinkedList<ActorRef>();
+				}
+				users.add(requestSender);
+				resourceReads.put(resourceName, users);
+
+				log(LogMsg.makeAccessRequestGrantedLogMsg(requestSender, getSelf(), request));
+				requestSender.tell(new AccessRequestGrantedMsg(message), getSelf());
+			} else {
+				log(LogMsg.makeAccessRequestDeniedLogMsg(requestSender, getSelf(), request, AccessRequestDenialReason.RESOURCE_BUSY));
+				requestSender.tell(new AccessRequestDeniedMsg(request, AccessRequestDenialReason.RESOURCE_BUSY), getSelf());
+			}
+		}
+		else if (requestType == AccessRequestType.EXCLUSIVE_WRITE_NONBLOCKING) {
+			if (exclusiveWriteAvailable(resourceName, requestSender) && concurrentReadAvailable(resourceName, requestSender)) {
+				resourceWrites.put(resourceName, requestSender);
+
+				log(LogMsg.makeAccessRequestGrantedLogMsg(requestSender, getSelf(), request));
+				requestSender.tell(new AccessRequestGrantedMsg(message), getSelf());
+			} else {
+				log(LogMsg.makeAccessRequestDeniedLogMsg(requestSender, getSelf(), request, AccessRequestDenialReason.RESOURCE_BUSY));
+				requestSender.tell(new AccessRequestDeniedMsg(request, AccessRequestDenialReason.RESOURCE_BUSY), getSelf());
+			}
+		}
+	}
+
+	private boolean concurrentReadAvailable(String resourceName, ActorRef user) {
+		if (resourceReads.containsKey(resourceName)) {
+			for (ActorRef actor : resourceReads.get(resourceName)) {
+				if (!actor.equals(user))
+					return false;
+			}
+		}
+		return true;
+	}
+
+	private boolean exclusiveWriteAvailable(String resourceName, ActorRef user) {
+		if (resourceWrites.containsKey(resourceName)) {
+			if (!resourceWrites.get(resourceName).equals(user)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	
+
 }
+
+
+
+
+

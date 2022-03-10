@@ -6,10 +6,10 @@
 			<attribute name="module" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="/Users/Sean/eclipse-workspace/mp3/lib/akka-actor_2.11-2.5.11.jar"/>
-	<classpathentry kind="lib" path="/Users/Sean/eclipse-workspace/mp3/lib/config-1.3.2.jar"/>
-	<classpathentry kind="lib" path="/Users/Sean/eclipse-workspace/mp3/lib/hamcrest-core-1.3.jar"/>
-	<classpathentry kind="lib" path="/Users/Sean/eclipse-workspace/mp3/lib/junit-4.12.jar"/>
-	<classpathentry kind="lib" path="/Users/Sean/eclipse-workspace/mp3/lib/scala-library-2.11.12.jar"/>
+	<classpathentry kind="lib" path="/Users/Crunchwrap Supreme/Documents/CMSC433 Workspace/mp3-student-1/student/lib/akka-actor_2.11-2.5.11.jar"/>
+	<classpathentry kind="lib" path="/Users/Crunchwrap Supreme/Documents/CMSC433 Workspace/mp3-student-1/student/lib/config-1.3.2.jar"/>
+	<classpathentry kind="lib" path="/Users/Crunchwrap Supreme/Documents/CMSC433 Workspace/mp3-student-1/student/lib/hamcrest-core-1.3.jar"/>
+	<classpathentry kind="lib" path="/Users/Crunchwrap Supreme/Documents/CMSC433 Workspace/mp3-student-1/student/lib/junit-4.12.jar"/>
+	<classpathentry kind="lib" path="/Users/Crunchwrap Supreme/Documents/CMSC433 Workspace/mp3-student-1/student/lib/scala-library-2.11.12.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
