@@ -91,12 +91,33 @@ public class ResourceManagerActor extends AbstractActor {
 	public void onReceive(Object msg) throws Exception {		
 		if (msg instanceof AddRemoteManagersRequestMsg) {
 			AddRemoteManagersRequestMsg message = (AddRemoteManagersRequestMsg) msg;
+			ArrayList<ActorRef> managers = message.getManagerList();
+
+			for (ActorRef manager : managers) {
+				if (!manager.equals(getSelf())) {
+					remoteManagers.add(manager);
+				}
+			}
+			getSender().tell(new AddRemoteManagersResponseMsg(message), getSelf());
 		}
 		else if (msg instanceof AddLocalUsersRequestMsg) {
 			AddLocalUsersRequestMsg message = (AddLocalUsersRequestMsg) msg;
+			ArrayList<ActorRef> users = message.getLocalUsers();
+
+			for (ActorRef user : users) {
+				localUsers.add(user);
+			}
+			getSender().tell(new AddLocalUsersResponseMsg(message), getSelf());
 		}
 		else if (msg instanceof AddInitialLocalResourcesRequestMsg) {
 			AddInitialLocalResourcesRequestMsg message = (AddInitialLocalResourcesRequestMsg) msg;
+			ArrayList<Resource> resources = message.getLocalResources();
+
+			for (Resource resource : resources) {
+				log(LogMsg.makeLocalResourceCreatedLogMsg(getSelf(), resource.getName()));
+				localResources.put(resource.getName(), resource);
+			}
+			getSender().tell(new AddInitialLocalResourcesResponseMsg(message), getSelf());
 		}
 		else if (msg instanceof AccessRequestMsg) {
 			AccessRequestMsg message = (AccessRequestMsg) msg;
