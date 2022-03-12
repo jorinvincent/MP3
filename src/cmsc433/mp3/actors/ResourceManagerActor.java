@@ -27,9 +27,9 @@ public class ResourceManagerActor extends AbstractActor {
 	private Map<String, Queue<AccessRequestMsg>> resourceQueue = new HashMap<String, Queue<AccessRequestMsg>>();
 	private Map<String, List<ActorRef>> resourceReads = new HashMap<String, List<ActorRef>>();
 	private Map<String, ActorRef> resourceWrites = new HashMap<String, ActorRef>();
-	private Map<String, ActorRef> sourceList = new HashMap<String, ActorRef>();
-	private Map<Object, Integer> potentialList = new HashMap<Object, Integer>();
-	private Map<ActorRef, Map<String, Object>> resourceMessages = new HashMap<ActorRef, Map<String, Object>>();
+	private Map<ActorRef, Map<String, AccessRequestMsg>> resourceRequestMessages = new HashMap<ActorRef, Map<String, AccessRequestMsg>>();
+	private Map<String, ActorRef> remoteResourceList = new HashMap<String, ActorRef>();
+	private Map<AccessRequestMsg, Integer> potentialRemoteResourceList = new HashMap<AccessRequestMsg, Integer>();
 
 	/**
 	 * Props structure-generator for this class.
@@ -129,15 +129,72 @@ public class ResourceManagerActor extends AbstractActor {
 					}
 				}
 			}
+			else if (remoteResourceList.containsKey(resourceName)) {
+				ActorRef remoteManager = remoteResourceList.get(resourceName);
+
+				log(LogMsg.makeAccessRequestForwardedLogMsg(getSelf(), remoteManager, request));
+				remoteManager.tell(message, getSelf());
+			}
+			else {
+				WhoHasResourceRequestMsg whoHasResourceRequestMessage = new WhoHasResourceRequestMsg(resourceName);
+
+				potentialRemoteResourceList.put(message, remoteManagers.size());
+				for (ActorRef manager : remoteManagers) {
+					if(!resourceRequestMessages.containsKey(manager)) {
+						resourceRequestMessages.put(manager, new HashMap<String, AccessRequestMsg>());
+					}
+					resourceRequestMessages.get(manager).put(resourceName, message);
+					manager.tell(whoHasResourceRequestMessage, getSelf());
+				}
+			}
 		}
 		else if (msg instanceof AccessReleaseMsg) {
 			AccessReleaseMsg message = (AccessReleaseMsg) msg;
 		}
 		else if (msg instanceof WhoHasResourceRequestMsg) {
 			WhoHasResourceRequestMsg message = (WhoHasResourceRequestMsg) msg;
+			String resourceName = message.getResourceName();
+
+			if (localResources.containsKey(resourceName)) {
+				WhoHasResourceResponseMsg responseMessage = new WhoHasResourceResponseMsg(resourceName, true, getSelf());
+				getSender().tell(responseMessage, getSelf());
+			}
+			else {
+				WhoHasResourceResponseMsg responseMessage = new WhoHasResourceResponseMsg(resourceName, false, getSelf());
+				getSender().tell(responseMessage, getSelf());
+			}
 		}
 		else if (msg instanceof WhoHasResourceResponseMsg) {
 			WhoHasResourceResponseMsg message = (WhoHasResourceResponseMsg) msg;
+			String resourceName = message.getResourceName();
+			ActorRef sender = message.getSender();
+			Boolean result = message.getResult();
+
+			AccessRequestMsg requestMessage = resourceRequestMessages.get(sender).get(resourceName);
+			AccessRequest request = requestMessage.getAccessRequest();
+			ActorRef requestSender = requestMessage.getReplyTo();
+
+			if (result) {
+				log(LogMsg.makeRemoteResourceDiscoveredLogMsg(getSelf(), sender, resourceName));
+				remoteResourceList.put(resourceName, sender);
+
+				log(LogMsg.makeAccessRequestForwardedLogMsg(getSelf(), sender, request));
+				potentialRemoteResourceList.remove(requestMessage);
+				resourceRequestMessages.get(sender).remove(resourceName);
+				sender.tell(requestMessage, getSelf());
+			}
+			else {
+				Integer count = potentialRemoteResourceList.get(requestMessage);
+
+				if (count != 0) {
+					count--;
+					potentialRemoteResourceList.put(requestMessage, count);
+				}
+				if (count == 0) {
+					log(LogMsg.makeAccessRequestDeniedLogMsg(requestSender, getSelf(), request, AccessRequestDenialReason.RESOURCE_NOT_FOUND));
+					requestSender.tell(new AccessRequestDeniedMsg(request, AccessRequestDenialReason.RESOURCE_NOT_FOUND), getSelf());
+				}
+			}
 		}
 	}
 
