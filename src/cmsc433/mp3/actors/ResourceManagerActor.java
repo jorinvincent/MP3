@@ -171,6 +171,25 @@ public class ResourceManagerActor extends AbstractActor {
 		}
 		else if (msg instanceof AccessReleaseMsg) {
 			AccessReleaseMsg message = (AccessReleaseMsg) msg;
+			AccessRelease accessRelease = message.getAccessRelease();
+			ActorRef releaseSender = message.getSender();
+			String resourceName = accessRelease.getResourceName();
+
+			log(LogMsg.makeAccessReleaseReceivedLogMsg(releaseSender, getSelf(), accessRelease));
+
+			if (localResources.containsKey(resourceName)) {
+				handleRelease(message);
+				handleBlockingAccessRequests(resourceName);
+			}
+			else if (remoteResourceList.containsKey(resourceName)) {
+				ActorRef remoteManager = remoteResourceList.get(resourceName);
+
+				log(LogMsg.makeAccessReleaseForwardedLogMsg(getSelf(), remoteManager, accessRelease));
+				remoteManager.tell(message, getSelf());
+			}
+			else {
+				log(LogMsg.makeAccessReleaseIgnoredLogMsg(releaseSender, getSelf(), accessRelease));
+			}
 		}
 		else if (msg instanceof WhoHasResourceRequestMsg) {
 			WhoHasResourceRequestMsg message = (WhoHasResourceRequestMsg) msg;
@@ -314,11 +333,44 @@ public class ResourceManagerActor extends AbstractActor {
 		return true;
 	}
 
-	
+	private void handleRelease(AccessReleaseMsg message) {
+		AccessRelease accessRelease = message.getAccessRelease();
+		ActorRef releaseSender = message.getSender();
+		String resourceName = accessRelease.getResourceName();
+		AccessType accessType = accessRelease.getType();
+
+		if (accessType == AccessType.CONCURRENT_READ) {
+			if (resourceReads.containsKey(resourceName)) {
+				List<ActorRef> users = resourceReads.get(resourceName);
+
+				if (users.contains(releaseSender)) {
+					log(LogMsg.makeAccessReleasedLogMsg(releaseSender, getSelf(), accessRelease));
+					users.remove(releaseSender);
+				}
+				else {
+					log(LogMsg.makeAccessReleaseIgnoredLogMsg(releaseSender, getSelf(), accessRelease));
+				}
+			}
+			else {
+				log(LogMsg.makeAccessReleaseIgnoredLogMsg(releaseSender, getSelf(), accessRelease));
+			}
+		}
+		else if (accessType == AccessType.EXCLUSIVE_WRITE) {
+			if (resourceWrites.containsKey(resourceName)) {
+				ActorRef user = resourceWrites.get(resourceName);
+
+				if (user.equals(releaseSender)) {
+					log(LogMsg.makeAccessReleasedLogMsg(releaseSender, getSelf(), accessRelease));
+					resourceWrites.remove(resourceName);
+				}
+				else {
+					log(LogMsg.makeAccessReleaseIgnoredLogMsg(releaseSender, getSelf(), accessRelease));
+				}
+			}
+			else {
+				log(LogMsg.makeAccessReleaseIgnoredLogMsg(releaseSender, getSelf(), accessRelease));
+			}
+		}
+	}
 
 }
-
-
-
-
-
